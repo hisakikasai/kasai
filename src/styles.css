@@ -58,6 +58,7 @@ h2 { font-size: 1.05rem; margin: 0 0 8px; }
   position: sticky; top: 0; z-index: 10;
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 16px; background: var(--card); border-bottom: 1px solid var(--border);
+  padding-top: calc(10px + env(safe-area-inset-top));
 }
 .brand { font-weight: 700; color: var(--text); }
 .topnav { display: none; gap: 16px; }
@@ -179,3 +180,7 @@ textarea { width: 100%; resize: vertical; }
 .hm-cell.lx { background: transparent; }
 /* 狭い画面で折り返す行では入力欄が潰れないように最小幅を確保 */
 .row.wrap > .grow { flex: 1 1 160px; }
+
+/* iOS Safari は 16px 未満の入力欄にフォーカスすると画面を拡大するため */
+input, select, textarea { font-size: 16px; }
+.ios-steps { margin: 4px 0; padding-left: 20px; }

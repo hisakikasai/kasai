@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import { StoreProvider } from './store';
+import { requestPersistentStorage } from './lib/platform';
 import './styles.css';
 
 createRoot(document.getElementById('root')!).render(
@@ -17,3 +18,5 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
     navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('SW 登録失敗', e));
   });
 }
+
+requestPersistentStorage();

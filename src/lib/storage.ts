@@ -57,7 +57,26 @@ export function saveData(data: AppData, storage: Storage = localStorage): boolea
   }
 }
 
-export function downloadText(filename: string, text: string, mime: string) {
+/**
+ * ファイルを保存する。iPhone などタッチ端末では共有シートを使う
+ * （ホーム画面アプリではダウンロードリンクが動かないことがあるため。「"ファイル"に保存」で保存できる）
+ */
+export async function saveFile(filename: string, text: string, mime: string): Promise<void> {
+  const file = new File([text], filename, { type: mime });
+  const touch = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
+  if (touch && navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file] });
+      return;
+    } catch (e) {
+      // ユーザーが共有をキャンセルした場合は何もしない
+      if ((e as DOMException).name === 'AbortError') throw e;
+    }
+  }
+  downloadText(filename, text, mime);
+}
+
+function downloadText(filename: string, text: string, mime: string) {
   const blob = new Blob([text], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { useStore } from '../store';
+import { isIos, isStandalone } from '../lib/platform';
 import { buildAlerts, currentStreak, longestStreak, minutesByDate } from '../lib/stats';
 import { addDays, formatMinutes, todayYmd } from '../lib/date';
 import { href } from '../router';
@@ -6,9 +8,19 @@ import QuickLog from './QuickLog';
 import Heatmap from './Heatmap';
 import CertCard from './CertCard';
 import LinkButtons from './LinkButtons';
+import InstallGuide from './InstallGuide';
+
+const INSTALL_DISMISS_KEY = 'shikaku-manager:install-dismissed';
 
 export default function Dashboard() {
   const { data } = useStore();
+  const [showInstall, setShowInstall] = useState(() => {
+    try {
+      return isIos() && !isStandalone() && !localStorage.getItem(INSTALL_DISMISS_KEY);
+    } catch {
+      return false;
+    }
+  });
   const today = todayYmd();
   const byDate = minutesByDate(data.logs);
   const todayMin = byDate.get(today) ?? 0;
@@ -24,6 +36,24 @@ export default function Dashboard() {
 
   return (
     <div className="stack">
+      {showInstall && (
+        <section className="card">
+          <div className="row between">
+            <h2>📱 ホーム画面に追加しましょう</h2>
+            <button
+              className="btn ghost sm"
+              aria-label="閉じる"
+              onClick={() => {
+                localStorage.setItem(INSTALL_DISMISS_KEY, '1');
+                setShowInstall(false);
+              }}
+            >
+              ✕
+            </button>
+          </div>
+          <InstallGuide />
+        </section>
+      )}
       <section className="stats">
         <div className="stat">
           <div className="stat-value">🔥 {streak}日</div>

@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react';
 import { useStore } from '../store';
-import { downloadText, emptyData, normalizeData } from '../lib/storage';
+import { emptyData, normalizeData, saveFile } from '../lib/storage';
+import { isStandalone } from '../lib/platform';
+import InstallGuide from './InstallGuide';
 import { formatYmd, todayYmd } from '../lib/date';
 import LinkEditor from './LinkEditor';
 
@@ -9,12 +11,16 @@ export default function SettingsPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState('');
 
-  const exportJson = () => {
+  const exportJson = async () => {
     const now = new Date().toISOString();
     const out = { ...data, timer: undefined, settings: { ...data.settings, lastBackupAt: now } };
-    downloadText(`shikaku-backup-${todayYmd()}.json`, JSON.stringify(out, null, 2), 'application/json');
+    try {
+      await saveFile(`shikaku-backup-${todayYmd()}.json`, JSON.stringify(out, null, 2), 'application/json');
+    } catch {
+      return; // 共有シートをキャンセル
+    }
     update((d) => (d.settings.lastBackupAt = now));
-    setMsg('バックアップをダウンロードしました');
+    setMsg('バックアップを保存しました');
   };
 
   const exportCsv = () => {
@@ -25,7 +31,7 @@ export default function SettingsPage() {
       ...[...data.logs].sort((a, b) => a.date.localeCompare(b.date)).map((l) => [l.date, names.get(l.certId) ?? '', String(l.minutes), l.memo ?? '']),
     ];
     // Excel で文字化けしないよう BOM を付ける
-    downloadText(`study-logs-${todayYmd()}.csv`, '﻿' + rows.map((r) => r.map(esc).join(',')).join('\r\n'), 'text/csv');
+    saveFile(`study-logs-${todayYmd()}.csv`, '\uFEFF' + rows.map((r) => r.map(esc).join(',')).join('\r\n'), 'text/csv').catch(() => {});
   };
 
   const importJson = async (file: File) => {
@@ -91,9 +97,11 @@ export default function SettingsPage() {
 
       <section className="card">
         <h2>ホーム画面に追加</h2>
-        <p className="small">
-          スマホのブラウザで「ホーム画面に追加」するとアプリのように起動でき、オフラインでも記録できます。
-        </p>
+        {isStandalone() ? (
+          <p className="small ok">ホーム画面アプリとして起動中です。</p>
+        ) : (
+          <InstallGuide />
+        )}
       </section>
 
       <section className="card">
@@ -112,3 +120,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+

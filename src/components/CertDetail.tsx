@@ -6,7 +6,7 @@ import { newId } from '../lib/id';
 import { certProgress } from '../lib/stats';
 import { addDays, diffDays, formatMinutes, formatYmd, todayYmd } from '../lib/date';
 import { examToIcs, googleCalendarUrl } from '../lib/calendar';
-import { downloadText } from '../lib/storage';
+import { saveFile } from '../lib/storage';
 import { href, navigate } from '../router';
 import LinkEditor from './LinkEditor';
 import LinkButtons from './LinkButtons';
@@ -197,7 +197,7 @@ function BasicInfo({ cert, patch }: { cert: Certification; patch: Patch }) {
       </div>
       {ics && (
         <div className="row wrap">
-          <button className="btn sm" onClick={() => downloadText(`exam-${cert.examDate}.ics`, ics, 'text/calendar')}>
+          <button className="btn sm" onClick={() => saveFile(`exam-${cert.examDate}.ics`, ics, 'text/calendar').catch(() => {})}>
             📅 カレンダーに追加 (.ics)
           </button>
           {gcal && (
