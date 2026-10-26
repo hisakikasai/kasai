@@ -27,15 +27,16 @@ export function diffDays(from: string, to: string): number {
 }
 
 export function formatYmd(ymd?: string): string {
-  if (!ymd) return '未設定';
+  if (!ymd) return '—';
   const d = parseYmd(ymd);
   const w = '日月火水木金土'[d.getDay()];
-  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}(${w})`;
+  const md = `${d.getMonth() + 1}/${d.getDate()}(${w})`;
+  return d.getFullYear() === new Date().getFullYear() ? md : `${d.getFullYear()}/${md}`;
 }
 
 export function formatMinutes(min: number): string {
-  if (min < 60) return `${min}分`;
+  if (min < 60) return `${min}m`;
   const h = Math.floor(min / 60);
   const m = min % 60;
-  return m ? `${h}時間${m}分` : `${h}時間`;
+  return m ? `${h}h${m}m` : `${h}h`;
 }

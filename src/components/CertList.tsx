@@ -3,12 +3,13 @@ import { useStore } from '../store';
 import { newId } from '../lib/id';
 import { navigate } from '../router';
 import CertCard from './CertCard';
+import { Archive, Plus } from './icons';
 
 const TEMPLATES = [
-  { name: 'AWS Certified Solutions Architect - Associate', provider: 'AWS', link: { label: 'AWS Skill Builder', url: 'https://skillbuilder.aws/' } },
-  { name: 'AWS Certified Cloud Practitioner', provider: 'AWS', link: { label: 'AWS Skill Builder', url: 'https://skillbuilder.aws/' } },
-  { name: '基本情報技術者試験', provider: 'IPA', link: { label: 'IPA', url: 'https://www.ipa.go.jp/shiken/' } },
-  { name: '応用情報技術者試験', provider: 'IPA', link: { label: 'IPA', url: 'https://www.ipa.go.jp/shiken/' } },
+  { name: 'AWS SAA', provider: 'AWS', link: { label: 'AWS Skill Builder', url: 'https://skillbuilder.aws/' } },
+  { name: 'AWS CLF', provider: 'AWS', link: { label: 'AWS Skill Builder', url: 'https://skillbuilder.aws/' } },
+  { name: '基本情報', provider: 'IPA', link: { label: 'IPA', url: 'https://www.ipa.go.jp/shiken/' } },
+  { name: '応用情報', provider: 'IPA', link: { label: 'IPA', url: 'https://www.ipa.go.jp/shiken/' } },
 ];
 
 export default function CertList() {
@@ -35,47 +36,45 @@ export default function CertList() {
     navigate({ name: 'cert', id });
   };
 
+  const archivedCount = data.certifications.filter((c) => c.archived).length;
   const list = data.certifications
     .filter((c) => showArchived || !c.archived)
     .sort((a, b) => (a.examDate ?? '9999').localeCompare(b.examDate ?? '9999'));
 
   return (
     <div className="stack">
-      <section className="card">
-        <h2>資格を追加</h2>
+      <section className="card stack-sm">
         <div className="row">
           <input
             className="grow"
-            placeholder="資格名（例: AWS SAA）"
+            placeholder="資格名"
+            aria-label="資格名"
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && create(name)}
           />
-          <button className="btn primary" onClick={() => create(name)}>
-            追加
+          <button className="btn primary icon" aria-label="追加" onClick={() => create(name)}>
+            <Plus size={20} />
           </button>
         </div>
-        <div className="chips mt">
-          <span className="muted small">テンプレート:</span>
+        <div className="chips">
           {TEMPLATES.map((t) => (
             <button key={t.name} className="chip" onClick={() => create(t.name, t.provider, t.link)}>
-              + {t.name}
+              <Plus size={12} /> {t.name}
             </button>
           ))}
         </div>
       </section>
 
-      <div className="row between">
-        <h2>資格一覧（{list.length}）</h2>
-        <label className="small row nowrap">
-          <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
-          アーカイブも表示
-        </label>
-      </div>
-      {list.length === 0 && <p className="muted">まだ資格が登録されていません。</p>}
       {list.map((c) => (
         <CertCard key={c.id} cert={c} />
       ))}
+
+      {archivedCount > 0 && (
+        <button className={`btn ghost self-center ${showArchived ? 'active' : ''}`} onClick={() => setShowArchived(!showArchived)} aria-label="アーカイブを表示">
+          <Archive size={16} /> {archivedCount}
+        </button>
+      )}
     </div>
   );
 }

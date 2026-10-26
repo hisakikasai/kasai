@@ -6,12 +6,13 @@ import CertDetail from './components/CertDetail';
 import LogsPage from './components/LogsPage';
 import SettingsPage from './components/SettingsPage';
 import TimerBanner from './components/TimerBanner';
+import { BookOpen, History, House, Settings, X } from './components/icons';
 
 const NAV = [
-  { name: 'home', label: 'ホーム', icon: '🏠', to: href({ name: 'home' }) },
-  { name: 'certs', label: '資格', icon: '📚', to: href({ name: 'certs' }) },
-  { name: 'logs', label: '記録', icon: '📝', to: href({ name: 'logs' }) },
-  { name: 'settings', label: '設定', icon: '⚙️', to: href({ name: 'settings' }) },
+  { name: 'home', label: 'ホーム', Icon: House, to: href({ name: 'home' }) },
+  { name: 'certs', label: '資格', Icon: BookOpen, to: href({ name: 'certs' }) },
+  { name: 'logs', label: '記録', Icon: History, to: href({ name: 'logs' }) },
+  { name: 'settings', label: '設定', Icon: Settings, to: href({ name: 'settings' }) },
 ] as const;
 
 export default function App() {
@@ -22,13 +23,13 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <a href={href({ name: 'home' })} className="brand">
-          資格マネージャー
+        <a href={href({ name: 'home' })} className="brand" aria-label="ホーム">
+          <img src="./icon.svg" alt="" width={28} height={28} />
         </a>
         <nav className="topnav">
-          {NAV.map((n) => (
-            <a key={n.name} href={n.to} className={active === n.name ? 'active' : ''}>
-              {n.label}
+          {NAV.map(({ name, label, Icon, to }) => (
+            <a key={name} href={to} className={active === name ? 'active' : ''} aria-label={label} title={label}>
+              <Icon size={22} />
             </a>
           ))}
         </nav>
@@ -36,7 +37,9 @@ export default function App() {
 
       <TimerBanner />
       {saveError && (
-        <div className="banner danger">保存に失敗しました。ブラウザの容量やプライベートモードを確認してください。</div>
+        <div className="banner danger" role="alert">
+          <X size={18} /> 保存失敗
+        </div>
       )}
 
       <main className="content">
@@ -48,10 +51,9 @@ export default function App() {
       </main>
 
       <nav className="bottomnav">
-        {NAV.map((n) => (
-          <a key={n.name} href={n.to} className={active === n.name ? 'active' : ''}>
-            <span aria-hidden>{n.icon}</span>
-            {n.label}
+        {NAV.map(({ name, label, Icon, to }) => (
+          <a key={name} href={to} className={active === name ? 'active' : ''} aria-label={label}>
+            <Icon size={24} strokeWidth={active === name ? 2.5 : 2} />
           </a>
         ))}
       </nav>

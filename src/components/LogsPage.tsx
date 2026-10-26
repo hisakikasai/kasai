@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useStore } from '../store';
 import { formatMinutes, formatYmd } from '../lib/date';
 import Heatmap from './Heatmap';
+import { Clock, Pencil, Trash2 } from './icons';
 
 export default function LogsPage() {
   const { data, update } = useStore();
@@ -17,25 +18,26 @@ export default function LogsPage() {
 
   return (
     <div className="stack">
-      <section className="card">
+      <section className="card stack-sm">
         <div className="row between">
-          <h2>学習記録</h2>
-          <select value={certId} onChange={(e) => setCertId(e.target.value)} aria-label="資格で絞り込み">
-            <option value="">すべての資格</option>
-            {data.certifications.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+          <span className="row nowrap">
+            <Clock size={18} /> <strong>{formatMinutes(logs.reduce((s, l) => s + l.minutes, 0))}</strong>
+            <span className="muted small">/ {groups.size}d</span>
+          </span>
+          {data.certifications.length > 1 && (
+            <select value={certId} onChange={(e) => setCertId(e.target.value)} aria-label="資格で絞り込み">
+              <option value="">all</option>
+              {data.certifications.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
         <Heatmap logs={logs} goal={data.settings.dailyGoalMinutes} weeks={26} />
-        <div className="small">
-          合計 {formatMinutes(logs.reduce((s, l) => s + l.minutes, 0))} / {groups.size}日
-        </div>
       </section>
 
-      {logs.length === 0 && <p className="muted">記録はまだありません。</p>}
       {[...groups.entries()].map(([date, items]) => (
         <section key={date} className="card">
           <div className="row between">
@@ -45,19 +47,21 @@ export default function LogsPage() {
           <ul className="list">
             {items.map((l) => (
               <li key={l.id} className="row between">
-                <span>
-                  {names.get(l.certId) ?? '(削除された資格)'} <strong>{formatMinutes(l.minutes)}</strong>{' '}
-                  <span className="muted">{l.memo}</span>
+                <span className="row grow">
+                  <strong className="nowrap">{formatMinutes(l.minutes)}</strong>
+                  <span className="ellipsis">{names.get(l.certId) ?? '—'}</span>
+                  <span className="muted ellipsis">{l.memo}</span>
                 </span>
                 <span className="row nowrap">
                   <button
-                    className="btn ghost sm"
+                    className="btn ghost icon"
+                    aria-label="編集"
                     onClick={() => {
-                      const m = prompt('学習時間（分）', String(l.minutes));
+                      const m = prompt('分', String(l.minutes));
                       if (m === null) return;
                       const n = Number(m);
-                      if (!Number.isFinite(n) || n <= 0) return alert('1 以上の数値を入力してください');
-                      const memo = prompt('メモ', l.memo ?? '');
+                      if (!Number.isFinite(n) || n <= 0) return;
+                      const memo = prompt('', l.memo ?? '');
                       update((d) => {
                         const x = d.logs.find((y) => y.id === l.id);
                         if (!x) return;
@@ -66,13 +70,14 @@ export default function LogsPage() {
                       });
                     }}
                   >
-                    編集
+                    <Pencil size={16} />
                   </button>
                   <button
-                    className="btn ghost sm danger"
-                    onClick={() => confirm('この記録を削除しますか？') && update((d) => (d.logs = d.logs.filter((y) => y.id !== l.id)))}
+                    className="btn ghost icon danger"
+                    aria-label="削除"
+                    onClick={() => confirm('削除?') && update((d) => (d.logs = d.logs.filter((y) => y.id !== l.id)))}
                   >
-                    削除
+                    <Trash2 size={16} />
                   </button>
                 </span>
               </li>

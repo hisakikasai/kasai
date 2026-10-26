@@ -1,9 +1,9 @@
 export type CertStatus = 'planning' | 'studying' | 'booked' | 'passed' | 'failed';
 
 export const CERT_STATUS_LABEL: Record<CertStatus, string> = {
-  planning: '検討中',
+  planning: '検討',
   studying: '勉強中',
-  booked: '受験予約済み',
+  booked: '予約済',
   passed: '合格',
   failed: '不合格',
 };
@@ -29,15 +29,15 @@ export type ExpenseStatus = 'unapplied' | 'applied' | 'approved' | 'paid';
 
 export const EXPENSE_KIND_LABEL: Record<ExpenseKind, string> = {
   exam: '受験料',
-  material: '教材費',
+  material: '教材',
   other: 'その他',
 };
 
 export const EXPENSE_STATUS_LABEL: Record<ExpenseStatus, string> = {
-  unapplied: '未申請',
-  applied: '申請済み',
-  approved: '承認済み',
-  paid: '精算完了',
+  unapplied: '未',
+  applied: '申請',
+  approved: '承認',
+  paid: '精算',
 };
 
 export interface Expense {

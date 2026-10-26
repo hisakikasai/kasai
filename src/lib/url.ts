@@ -26,9 +26,9 @@ export function hostOf(url: string): string {
 
 export const LINK_PRESETS: { label: string; url: string }[] = [
   { label: 'AWS Skill Builder', url: 'https://skillbuilder.aws/' },
-  { label: 'AWS 認定', url: 'https://aws.amazon.com/jp/certification/' },
+  { label: 'AWS Certification', url: 'https://aws.amazon.com/jp/certification/' },
   { label: 'Microsoft Learn', url: 'https://learn.microsoft.com/ja-jp/training/' },
   { label: 'Google Cloud Skills Boost', url: 'https://www.cloudskillsboost.google/' },
-  { label: 'IPA 情報処理技術者試験', url: 'https://www.ipa.go.jp/shiken/' },
+  { label: 'IPA', url: 'https://www.ipa.go.jp/shiken/' },
   { label: 'Udemy', url: 'https://www.udemy.com/' },
 ];

@@ -3,12 +3,13 @@ import { useStore } from '../store';
 import { isIos, isStandalone } from '../lib/platform';
 import { buildAlerts, currentStreak, longestStreak, minutesByDate } from '../lib/stats';
 import { addDays, formatMinutes, todayYmd } from '../lib/date';
-import { href } from '../router';
 import QuickLog from './QuickLog';
 import Heatmap from './Heatmap';
 import CertCard from './CertCard';
 import LinkButtons from './LinkButtons';
+import AlertList from './AlertList';
 import InstallGuide from './InstallGuide';
+import { CalendarDays, Flame, Target, X } from './icons';
 
 const INSTALL_DISMISS_KEY = 'shikaku-manager:install-dismissed';
 
@@ -29,6 +30,7 @@ export default function Dashboard() {
   const goal = data.settings.dailyGoalMinutes;
   const streak = currentStreak(data.logs, today);
   const alerts = buildAlerts(data, today);
+  const goalRatio = Math.min(1, todayMin / goal);
 
   const active = data.certifications
     .filter((c) => !c.archived && c.status !== 'passed' && c.status !== 'failed')
@@ -37,79 +39,53 @@ export default function Dashboard() {
   return (
     <div className="stack">
       {showInstall && (
-        <section className="card">
-          <div className="row between">
-            <h2>📱 ホーム画面に追加しましょう</h2>
-            <button
-              className="btn ghost sm"
-              aria-label="閉じる"
-              onClick={() => {
-                localStorage.setItem(INSTALL_DISMISS_KEY, '1');
-                setShowInstall(false);
-              }}
-            >
-              ✕
-            </button>
-          </div>
+        <div className="card row between">
           <InstallGuide />
-        </section>
+          <button
+            className="btn ghost icon"
+            aria-label="閉じる"
+            onClick={() => {
+              localStorage.setItem(INSTALL_DISMISS_KEY, '1');
+              setShowInstall(false);
+            }}
+          >
+            <X size={18} />
+          </button>
+        </div>
       )}
+
       <section className="stats">
-        <div className="stat">
-          <div className="stat-value">🔥 {streak}日</div>
-          <div className="stat-label">連続記録（最長 {longestStreak(data.logs)}日）</div>
+        <div className={`stat ${streak > 0 && todayMin === 0 ? 'at-risk' : ''}`} title={`連続記録（最長 ${longestStreak(data.logs)}日）`}>
+          <Flame size={22} className={streak > 0 ? 'flame' : 'muted'} />
+          <div className="stat-value">{streak}</div>
         </div>
-        <div className="stat">
-          <div className={`stat-value ${todayMin >= goal ? 'ok' : ''}`}>{formatMinutes(todayMin)}</div>
-          <div className="stat-label">今日 / 目標 {formatMinutes(goal)}</div>
+        <div className="stat" title={`今日 / 目標 ${formatMinutes(goal)}`}>
+          <div className="ring" style={{ ['--p' as string]: goalRatio }}>
+            <Target size={18} className={goalRatio >= 1 ? 'ok' : 'muted'} />
+          </div>
+          <div className={`stat-value ${goalRatio >= 1 ? 'ok' : ''}`}>{formatMinutes(todayMin)}</div>
         </div>
-        <div className="stat">
+        <div className="stat" title="直近7日">
+          <span className="row nowrap muted small"><CalendarDays size={18} />7d</span>
           <div className="stat-value">{formatMinutes(weekMin)}</div>
-          <div className="stat-label">直近7日</div>
         </div>
       </section>
-
-      {streak > 0 && todayMin === 0 && (
-        <div className="banner warn">今日はまだ記録がありません。5分だけでも記録して連続 {streak + 1} 日目にしましょう!</div>
-      )}
 
       <QuickLog />
 
-      {alerts.length > 0 && (
-        <section className="card">
-          <h2>確認事項</h2>
-          <ul className="alerts">
-            {alerts.map((a, i) => (
-              <li key={i} className={a.level}>
-                {a.certId ? <a href={href({ name: 'cert', id: a.certId })}>{a.message}</a> : <a href={href({ name: 'settings' })}>{a.message}</a>}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <AlertList alerts={alerts} />
 
-      <section className="stack">
-        <div className="row between">
-          <h2>受験予定</h2>
-          <a href={href({ name: 'certs' })} className="small">
-            すべての資格 →
-          </a>
-        </div>
-        {active.length === 0 && <p className="muted">勉強中の資格はありません。</p>}
-        {active.map((c) => (
-          <CertCard key={c.id} cert={c} />
-        ))}
-      </section>
+      {active.map((c) => (
+        <CertCard key={c.id} cert={c} />
+      ))}
 
       {data.globalLinks.length > 0 && (
         <section className="card">
-          <h2>学習サイト</h2>
           <LinkButtons links={data.globalLinks} />
         </section>
       )}
 
       <section className="card">
-        <h2>学習カレンダー</h2>
         <Heatmap logs={data.logs} goal={goal} />
       </section>
     </div>

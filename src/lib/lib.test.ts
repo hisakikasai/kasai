@@ -67,8 +67,8 @@ describe('buildAlerts', () => {
     );
     const msgs = buildAlerts(data, '2026-10-26');
     expect(msgs[0].level).toBe('danger');
-    expect(msgs.some((a) => a.message.includes('受験日を過ぎています'))).toBe(true);
-    expect(msgs.some((a) => a.message.includes('バックアップ'))).toBe(true);
+    expect(msgs.some((a) => a.kind === 'examPast')).toBe(true);
+    expect(msgs.some((a) => a.kind === 'backup')).toBe(true);
   });
 });
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useStore } from '../store';
 import { newId } from '../lib/id';
 import { toYmd } from '../lib/date';
+import { Check, Timer, X } from './icons';
 
 export function elapsedLabel(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -31,7 +32,7 @@ export default function TimerBanner() {
     let minutes = Math.max(1, Math.round(elapsed / 60000));
     // 止め忘れ対策: 3 時間を超えたら実際の学習時間を確認する
     if (save && minutes > 180) {
-      const input = prompt(`計測時間が ${minutes} 分になっています。記録する分数を入力してください`, String(minutes));
+      const input = prompt('分', String(minutes));
       if (input === null) return;
       const n = Number(input);
       if (!Number.isFinite(n) || n <= 0) return;
@@ -45,7 +46,7 @@ export default function TimerBanner() {
           // 開始した日の学習として記録（日付をまたいでも記録先がぶれないように）
           date: toYmd(new Date(timer.startedAt)),
           minutes,
-          memo: 'タイマー計測',
+          memo: undefined,
           createdAt: new Date().toISOString(),
         });
       }
@@ -55,18 +56,17 @@ export default function TimerBanner() {
 
   return (
     <div className="banner timer">
-      <span>
-        ⏱ {cert?.name ?? '学習'} を計測中 <strong className="mono">{elapsedLabel(elapsed)}</strong>
+      <span className="row grow">
+        <Timer size={18} className="pulse" />
+        <strong className="mono">{elapsedLabel(elapsed)}</strong>
+        <span className="muted ellipsis">{cert?.name}</span>
       </span>
-      <span className="row">
-        <button className="btn primary sm" onClick={() => stop(true)}>
-          終了して記録
+      <span className="row nowrap">
+        <button className="btn primary icon" aria-label="終了して記録" title="終了して記録" onClick={() => stop(true)}>
+          <Check size={20} />
         </button>
-        <button
-          className="btn ghost sm"
-          onClick={() => confirm('計測を破棄しますか？') && stop(false)}
-        >
-          破棄
+        <button className="btn ghost icon" aria-label="破棄" title="破棄" onClick={() => confirm('破棄?') && stop(false)}>
+          <X size={20} />
         </button>
       </span>
     </div>

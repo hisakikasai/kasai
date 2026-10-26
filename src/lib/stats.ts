@@ -75,10 +75,14 @@ export function certProgress(cert: Certification, logs: StudyLog[], today: strin
 }
 
 export type AlertLevel = 'danger' | 'warn' | 'info';
+export type AlertKind = 'noExamDate' | 'examPast' | 'booking' | 'overdueTasks' | 'unapplied' | 'noReceipt' | 'expiry' | 'backup';
 export interface Alert {
   level: AlertLevel;
-  message: string;
+  kind: AlertKind;
   certId?: string;
+  certName?: string;
+  /** 件数・残り日数・項目名など補足 */
+  detail?: string;
 }
 
 const ACTIVE = (c: Certification) => !c.archived;
@@ -89,47 +93,32 @@ export function buildAlerts(data: AppData, today: string = todayYmd()): Alert[] 
   for (const c of data.certifications.filter(ACTIVE)) {
     const p = certProgress(c, data.logs, today);
     const finished = c.status === 'passed' || c.status === 'failed';
+    const base = { certId: c.id, certName: c.name };
 
-    if (!finished && !c.examDate) {
-      alerts.push({ level: 'info', certId: c.id, message: `${c.name}: 受験日が未設定です` });
-    }
-    if (!finished && c.examDate && p.daysLeft !== undefined && p.daysLeft < 0) {
-      alerts.push({ level: 'warn', certId: c.id, message: `${c.name}: 受験日を過ぎています。結果（合格/不合格）を記録しましょう` });
-    }
+    if (!finished && !c.examDate) alerts.push({ ...base, level: 'info', kind: 'noExamDate' });
+    if (!finished && p.daysLeft !== undefined && p.daysLeft < 0) alerts.push({ ...base, level: 'warn', kind: 'examPast' });
     if (c.status === 'studying' && p.daysLeft !== undefined && p.daysLeft >= 0 && p.daysLeft <= 30) {
-      alerts.push({ level: 'warn', certId: c.id, message: `${c.name}: 受験日まで${p.daysLeft}日。受験予約は済んでいますか？` });
+      alerts.push({ ...base, level: 'warn', kind: 'booking', detail: `D-${p.daysLeft}` });
     }
-    if (p.overdueTasks > 0) {
-      alerts.push({ level: 'warn', certId: c.id, message: `${c.name}: 期限切れの勉強予定が${p.overdueTasks}件あります` });
-    }
+    if (p.overdueTasks > 0) alerts.push({ ...base, level: 'warn', kind: 'overdueTasks', detail: String(p.overdueTasks) });
     for (const e of c.expenses) {
       if (e.status === 'unapplied') {
-        const overdue = e.deadline && e.deadline < today;
-        alerts.push({
-          level: overdue ? 'danger' : 'warn',
-          certId: c.id,
-          message: `${c.name}: ${e.label || '経費'} が未申請${e.deadline ? `（期限 ${e.deadline}${overdue ? ' 超過' : ''}）` : ''}`,
-        });
+        const overdue = !!e.deadline && e.deadline < today;
+        alerts.push({ ...base, level: overdue ? 'danger' : 'warn', kind: 'unapplied', detail: e.label });
       } else if (!e.receiptSaved && e.status !== 'paid') {
-        alerts.push({ level: 'info', certId: c.id, message: `${c.name}: ${e.label || '経費'} の領収書が未保存です` });
+        alerts.push({ ...base, level: 'info', kind: 'noReceipt', detail: e.label });
       }
     }
     if (c.expiresAt) {
       const left = diffDays(today, c.expiresAt);
-      if (left <= 90) {
-        alerts.push({
-          level: left < 0 ? 'danger' : 'warn',
-          certId: c.id,
-          message: left < 0 ? `${c.name}: 有効期限が切れています` : `${c.name}: 有効期限まで${left}日。更新の準備を`,
-        });
-      }
+      if (left <= 90) alerts.push({ ...base, level: left < 0 ? 'danger' : 'warn', kind: 'expiry', detail: `${left}d` });
     }
   }
 
   const hasData = data.certifications.length > 0 || data.logs.length > 0;
   const last = data.settings.lastBackupAt;
   if (hasData && (!last || diffDays(last.slice(0, 10), today) >= 30)) {
-    alerts.push({ level: 'info', message: 'データはこの端末のブラウザ内にのみ保存されています。設定からバックアップを取りましょう' });
+    alerts.push({ level: 'info', kind: 'backup' });
   }
 
   const order: Record<AlertLevel, number> = { danger: 0, warn: 1, info: 2 };

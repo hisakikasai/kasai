@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import type { CertStatus, Certification, ExpenseKind, ExpenseStatus } from '../types';
+import { useState, type ReactNode } from 'react';
+import type { CertStatus, Certification, Expense, ExpenseKind, ExpenseStatus } from '../types';
 import { CERT_STATUS_LABEL, EXPENSE_KIND_LABEL, EXPENSE_STATUS_LABEL } from '../types';
 import { useStore } from '../store';
 import { newId } from '../lib/id';
@@ -11,15 +11,84 @@ import { href, navigate } from '../router';
 import LinkEditor from './LinkEditor';
 import LinkButtons from './LinkButtons';
 import { Countdown, Progress } from './CertCard';
+import type { LucideIcon } from 'lucide-react';
+import {
+  Archive,
+  ArchiveRestore,
+  BookOpen,
+  CalendarClock,
+  CalendarDays,
+  CalendarPlus,
+  Check,
+  ChevronLeft,
+  Clock,
+  Gauge,
+  History,
+  JapaneseYen,
+  Link,
+  ListChecks,
+  MapPin,
+  Pencil,
+  Plus,
+  Receipt,
+  RefreshCw,
+  Square,
+  StickyNote,
+  Target,
+  Ticket,
+  Trash2,
+  Trophy,
+  Wand2,
+  X,
+} from './icons';
+
+const STATUS_ICON: Record<CertStatus, LucideIcon> = {
+  planning: Square,
+  studying: BookOpen,
+  booked: Ticket,
+  passed: Trophy,
+  failed: X,
+};
+
+const EXPENSE_STEP_ICON: Record<ExpenseStatus, LucideIcon> = {
+  unapplied: Square,
+  applied: Check,
+  approved: Check,
+  paid: JapaneseYen,
+};
+
+function Section({ Icon, title, extra, children }: { Icon: LucideIcon; title: string; extra?: ReactNode; children: ReactNode }) {
+  return (
+    <section className="card stack-sm" aria-label={title}>
+      <div className="row between section-head">
+        <span className="row nowrap" title={title}>
+          <Icon size={20} />
+        </span>
+        {extra}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/** アイコン付きの入力欄 */
+function IconField({ Icon, label, children }: { Icon: LucideIcon; label: string; children: ReactNode }) {
+  return (
+    <label className="input-icon" title={label}>
+      <Icon size={18} />
+      {children}
+    </label>
+  );
+}
 
 export default function CertDetail({ id }: { id: string }) {
   const { data, update } = useStore();
   const cert = data.certifications.find((c) => c.id === id);
   if (!cert) {
     return (
-      <p>
-        資格が見つかりません。<a href={href({ name: 'certs' })}>一覧へ戻る</a>
-      </p>
+      <a href={href({ name: 'certs' })} className="row">
+        <ChevronLeft size={20} />
+      </a>
     );
   }
   const patch = (fn: (c: Certification) => void) =>
@@ -33,181 +102,175 @@ export default function CertDetail({ id }: { id: string }) {
 
   return (
     <div className="stack">
-      <a href={href({ name: 'certs' })} className="small">
-        ← 資格一覧
-      </a>
-      <div className="row between">
-        <h1>{cert.name}</h1>
-        <Countdown days={cert.status === 'passed' || cert.status === 'failed' ? undefined : p.daysLeft} />
+      <div className="row">
+        <a href={href({ name: 'certs' })} className="btn ghost icon" aria-label="戻る">
+          <ChevronLeft size={22} />
+        </a>
+        <input className="title-input grow" value={cert.name} aria-label="資格名" onChange={(e) => patch((c) => (c.name = e.target.value))} />
+        <Countdown cert={cert} days={p.daysLeft} />
       </div>
+
+      <div className="segmented" role="radiogroup" aria-label="ステータス">
+        {(Object.keys(CERT_STATUS_LABEL) as CertStatus[]).map((s) => {
+          const Icon = STATUS_ICON[s];
+          return (
+            <button
+              key={s}
+              role="radio"
+              aria-checked={cert.status === s}
+              className={cert.status === s ? 'on' : ''}
+              title={CERT_STATUS_LABEL[s]}
+              onClick={() => patch((c) => (c.status = s))}
+            >
+              <Icon size={18} />
+              <span>{CERT_STATUS_LABEL[s]}</span>
+            </button>
+          );
+        })}
+      </div>
+
       <LinkButtons links={cert.links} certId={cert.id} />
 
-      <section className="card">
-        <h2>サマリー</h2>
-        {p.planTotal > 0 && <Progress ratio={p.planRatio} label={`勉強予定 ${p.planDone}/${p.planTotal} 完了`} />}
-        {p.targetMinutes ? (
-          <Progress ratio={p.hoursRatio ?? 0} label={`学習 ${formatMinutes(p.studiedMinutes)} / ${cert.targetHours}時間`} />
-        ) : (
-          <div>累計 {formatMinutes(p.studiedMinutes)}（目標学習時間を設定するとペースを計算します）</div>
-        )}
+      <section className="card stack-sm">
+        {p.planTotal > 0 && <Progress Icon={ListChecks} ratio={p.planRatio} label={`${p.planDone}/${p.planTotal}`} />}
+        <Progress
+          Icon={Clock}
+          ratio={p.hoursRatio ?? 0}
+          label={p.targetMinutes ? `${formatMinutes(p.studiedMinutes)} / ${cert.targetHours}h` : formatMinutes(p.studiedMinutes)}
+        />
         {p.requiredPerDay !== undefined && (
-          <div className="small">
-            残り {p.daysLeft} 日 → 目標達成には 1日あたり約 <strong>{formatMinutes(p.requiredPerDay)}</strong>
+          <div className="row small" title="1日あたり必要な学習時間">
+            <Gauge size={16} /> <strong>{formatMinutes(p.requiredPerDay)}</strong>/日
           </div>
         )}
       </section>
 
-      <BasicInfo cert={cert} patch={patch} />
+      <ExamSection cert={cert} patch={patch} />
       <PlanSection cert={cert} patch={patch} />
 
-      <section className="card">
-        <h2>学習サイト・リンク</h2>
-        <p className="muted small">⏱ ボタンで開くと、サイトを開くと同時に学習タイマーが始まります。</p>
+      <Section Icon={Link} title="リンク">
         <LinkEditor links={cert.links} onChange={(links) => patch((c) => (c.links = links))} />
-      </section>
+      </Section>
 
       <ExpenseSection cert={cert} patch={patch} />
 
-      <section className="card">
-        <h2>学習記録（{logs.length}件・{formatMinutes(p.studiedMinutes)}）</h2>
-        {logs.length === 0 && <p className="muted">まだ記録がありません。ホームから記録できます。</p>}
+      <Section Icon={History} title="学習記録" extra={<span className="small muted">{formatMinutes(p.studiedMinutes)}</span>}>
         <ul className="list">
           {logs.slice(0, 20).map((l) => (
-            <li key={l.id} className="row between">
-              <span>
-                {formatYmd(l.date)} <strong>{formatMinutes(l.minutes)}</strong> <span className="muted">{l.memo}</span>
-              </span>
+            <li key={l.id} className="row">
+              <span className="muted small">{formatYmd(l.date)}</span> <strong>{formatMinutes(l.minutes)}</strong>{' '}
+              <span className="muted ellipsis">{l.memo}</span>
             </li>
           ))}
         </ul>
-        {logs.length > 20 && (
-          <a href={href({ name: 'logs' })} className="small">
-            すべての記録を見る →
-          </a>
-        )}
-      </section>
+      </Section>
 
-      <section className="card">
-        <h2>その他</h2>
-        <div className="row wrap">
-          <button className="btn" onClick={() => patch((c) => (c.archived = !c.archived))}>
-            {cert.archived ? 'アーカイブ解除' : 'アーカイブ'}
-          </button>
-          <button
-            className="btn danger"
-            onClick={() => {
-              if (!confirm(`「${cert.name}」と学習記録 ${logs.length} 件を削除します。よろしいですか？`)) return;
-              update((d) => {
-                d.certifications = d.certifications.filter((c) => c.id !== id);
-                d.logs = d.logs.filter((l) => l.certId !== id);
-                if (d.timer?.certId === id) d.timer = undefined;
-              });
-              navigate({ name: 'certs' });
-            }}
-          >
-            削除
-          </button>
-        </div>
-      </section>
+      <div className="row center">
+        <button
+          className="btn ghost icon"
+          aria-label={cert.archived ? 'アーカイブ解除' : 'アーカイブ'}
+          title={cert.archived ? 'アーカイブ解除' : 'アーカイブ'}
+          onClick={() => patch((c) => (c.archived = !c.archived))}
+        >
+          {cert.archived ? <ArchiveRestore size={20} /> : <Archive size={20} />}
+        </button>
+        <button
+          className="btn ghost icon danger"
+          aria-label="削除"
+          title="削除"
+          onClick={() => {
+            if (!confirm(`「${cert.name}」削除?`)) return;
+            update((d) => {
+              d.certifications = d.certifications.filter((c) => c.id !== id);
+              d.logs = d.logs.filter((l) => l.certId !== id);
+              if (d.timer?.certId === id) d.timer = undefined;
+            });
+            navigate({ name: 'certs' });
+          }}
+        >
+          <Trash2 size={20} />
+        </button>
+      </div>
     </div>
   );
 }
 
 type Patch = (fn: (c: Certification) => void) => void;
 
-function BasicInfo({ cert, patch }: { cert: Certification; patch: Patch }) {
+function ExamSection({ cert, patch }: { cert: Certification; patch: Patch }) {
   const ics = examToIcs(cert);
   const gcal = googleCalendarUrl(cert);
   const set = <K extends keyof Certification>(key: K, value: Certification[K]) => patch((c) => (c[key] = value));
   const opt = (v: string) => v || undefined;
 
   return (
-    <section className="card">
-      <h2>基本情報・受験日</h2>
+    <Section
+      Icon={CalendarDays}
+      title="受験"
+      extra={
+        ics && (
+          <span className="row nowrap">
+            <button
+              className="btn ghost icon"
+              aria-label="カレンダーに追加"
+              title="カレンダーに追加 (.ics)"
+              onClick={() => saveFile(`exam-${cert.examDate}.ics`, ics, 'text/calendar').catch(() => {})}
+            >
+              <CalendarPlus size={20} />
+            </button>
+            {gcal && (
+              <a className="btn ghost icon gcal" href={gcal} target="_blank" rel="noopener noreferrer" aria-label="Google カレンダーに追加" title="Google カレンダー">
+                G
+              </a>
+            )}
+          </span>
+        )
+      }
+    >
       <div className="grid">
-        <div className="field">
-          <label>資格名</label>
-          <input value={cert.name} onChange={(e) => set('name', e.target.value)} />
-        </div>
-        <div className="field">
-          <label>主催・ベンダー</label>
-          <input value={cert.provider} placeholder="AWS / IPA など" onChange={(e) => set('provider', e.target.value)} />
-        </div>
-        <div className="field">
-          <label>ステータス</label>
-          <select value={cert.status} onChange={(e) => set('status', e.target.value as CertStatus)}>
-            {Object.entries(CERT_STATUS_LABEL).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label>受験日</label>
+        <IconField Icon={CalendarDays} label="受験日">
           <input type="date" value={cert.examDate ?? ''} onChange={(e) => set('examDate', opt(e.target.value))} />
-        </div>
-        <div className="field">
-          <label>開始時刻</label>
+        </IconField>
+        <IconField Icon={Clock} label="時刻">
           <input type="time" value={cert.examTime ?? ''} onChange={(e) => set('examTime', opt(e.target.value))} />
-        </div>
-        <div className="field">
-          <label>会場 / 受験方法</label>
-          <input
-            value={cert.examLocation ?? ''}
-            placeholder="オンライン(OnVUE) / テストセンター名"
-            onChange={(e) => set('examLocation', opt(e.target.value))}
-          />
-        </div>
-        <div className="field">
-          <label>予約番号・確認番号</label>
-          <input value={cert.bookingRef ?? ''} onChange={(e) => set('bookingRef', opt(e.target.value))} />
-        </div>
-        <div className="field">
-          <label>目標学習時間（時間）</label>
+        </IconField>
+        <IconField Icon={MapPin} label="会場">
+          <input value={cert.examLocation ?? ''} placeholder="会場 / オンライン" onChange={(e) => set('examLocation', opt(e.target.value))} />
+        </IconField>
+        <IconField Icon={Ticket} label="予約番号">
+          <input value={cert.bookingRef ?? ''} placeholder="予約番号" onChange={(e) => set('bookingRef', opt(e.target.value))} />
+        </IconField>
+        <IconField Icon={Target} label="目標学習時間">
           <input
             type="number"
             min={0}
             inputMode="numeric"
             value={cert.targetHours ?? ''}
+            placeholder="目標"
             onChange={(e) => set('targetHours', e.target.value ? Number(e.target.value) : undefined)}
           />
-        </div>
+          <span className="muted">h</span>
+        </IconField>
         {(cert.status === 'passed' || cert.status === 'failed') && (
-          <div className="field">
-            <label>スコア</label>
-            <input value={cert.score ?? ''} placeholder="例: 812/1000" onChange={(e) => set('score', opt(e.target.value))} />
-          </div>
+          <IconField Icon={Trophy} label="スコア">
+            <input value={cert.score ?? ''} placeholder="スコア" onChange={(e) => set('score', opt(e.target.value))} />
+          </IconField>
         )}
         {cert.status === 'passed' && (
-          <div className="field">
-            <label>有効期限</label>
+          <IconField Icon={RefreshCw} label="有効期限">
             <input type="date" value={cert.expiresAt ?? ''} onChange={(e) => set('expiresAt', opt(e.target.value))} />
             {!cert.expiresAt && cert.examDate && (
-              <button className="btn ghost sm" onClick={() => set('expiresAt', addDays(cert.examDate!, 365 * 3))}>
-                受験日 + 3年で設定（AWS 等）
+              <button className="chip" title="受験日 + 3年" onClick={() => set('expiresAt', addDays(cert.examDate!, 365 * 3))}>
+                +3y
               </button>
             )}
-          </div>
+          </IconField>
         )}
       </div>
-      <div className="field">
-        <label>メモ</label>
-        <textarea rows={3} value={cert.note ?? ''} onChange={(e) => set('note', opt(e.target.value))} />
-      </div>
-      {ics && (
-        <div className="row wrap">
-          <button className="btn sm" onClick={() => saveFile(`exam-${cert.examDate}.ics`, ics, 'text/calendar').catch(() => {})}>
-            📅 カレンダーに追加 (.ics)
-          </button>
-          {gcal && (
-            <a className="btn sm" href={gcal} target="_blank" rel="noopener noreferrer">
-              Google カレンダーに追加
-            </a>
-          )}
-        </div>
-      )}
-    </section>
+      <IconField Icon={StickyNote} label="メモ">
+        <textarea rows={2} value={cert.note ?? ''} onChange={(e) => set('note', opt(e.target.value))} />
+      </IconField>
+    </Section>
   );
 }
 
@@ -227,12 +290,11 @@ function PlanSection({ cert, patch }: { cert: Certification; patch: Patch }) {
     if (!cert.examDate) return;
     const weeks = Math.ceil(diffDays(today, cert.examDate) / 7);
     if (weeks <= 0) return;
-    if (!confirm(`受験日まで ${weeks} 週分の予定枠を追加します。内容は後で編集してください。`)) return;
     patch((c) => {
       for (let i = 1; i <= weeks; i++) {
         const d = i === weeks ? cert.examDate! : addDays(today, i * 7);
-        const title = i === weeks ? '最終確認・模擬試験' : i === weeks - 1 ? '模擬試験 / 苦手分野の復習' : `第${i}週: 学習範囲を記入`;
-        c.plan.push({ id: newId(), title, dueDate: d, done: false });
+        const t = i === weeks ? '最終確認' : i === weeks - 1 ? '模擬試験' : `Week ${i}`;
+        c.plan.push({ id: newId(), title: t, dueDate: d, done: false });
       }
     });
   };
@@ -240,10 +302,20 @@ function PlanSection({ cert, patch }: { cert: Certification; patch: Patch }) {
   const sorted = [...cert.plan].sort(
     (a, b) => Number(a.done) - Number(b.done) || (a.dueDate ?? '9999').localeCompare(b.dueDate ?? '9999'),
   );
+  const canGenerate = !!cert.examDate && cert.plan.length === 0 && diffDays(today, cert.examDate) > 0;
 
   return (
-    <section className="card">
-      <h2>勉強予定・進捗</h2>
+    <Section
+      Icon={ListChecks}
+      title="勉強予定"
+      extra={
+        canGenerate && (
+          <button className="btn ghost icon" aria-label="受験日から週ごとの予定を作成" title="受験日から週ごとの予定を作成" onClick={generateWeekly}>
+            <Wand2 size={20} />
+          </button>
+        )
+      }
+    >
       <ul className="list">
         {sorted.map((t) => {
           const overdue = !t.done && t.dueDate && t.dueDate < today;
@@ -253,28 +325,28 @@ function PlanSection({ cert, patch }: { cert: Certification; patch: Patch }) {
                 <input
                   type="checkbox"
                   checked={t.done}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const checked = e.target.checked;
                     patch((c) => {
                       const x = c.plan.find((y) => y.id === t.id)!;
-                      x.done = e.target.checked;
-                      x.doneAt = e.target.checked ? todayYmd() : undefined;
-                    })
-                  }
+                      x.done = checked;
+                      x.doneAt = checked ? todayYmd() : undefined;
+                    });
+                  }}
                 />
-                <span className="grow">
-                  {t.title}
-                  {t.dueDate && <span className={`small ${overdue ? 'error' : 'muted'}`}> 〜{formatYmd(t.dueDate)}</span>}
-                </span>
+                <span className="grow">{t.title}</span>
+                {t.dueDate && <span className={`small nowrap ${overdue ? 'error' : 'muted'}`}>{formatYmd(t.dueDate)}</span>}
               </label>
               <span className="row nowrap">
                 <button
-                  className="btn ghost sm"
+                  className="btn ghost icon"
+                  aria-label="編集"
                   onClick={() => {
-                    const nt = prompt('予定の内容', t.title);
+                    const nt = prompt('', t.title);
                     if (nt === null || !nt.trim()) return;
-                    const nd = prompt('期限 (YYYY-MM-DD、空欄で期限なし)', t.dueDate ?? '');
+                    const nd = prompt('YYYY-MM-DD', t.dueDate ?? '');
                     if (nd === null) return;
-                    if (nd && !/^\d{4}-\d{2}-\d{2}$/.test(nd)) return alert('日付は YYYY-MM-DD 形式で入力してください');
+                    if (nd && !/^\d{4}-\d{2}-\d{2}$/.test(nd)) return;
                     patch((c) => {
                       const x = c.plan.find((y) => y.id === t.id)!;
                       x.title = nt.trim();
@@ -282,10 +354,10 @@ function PlanSection({ cert, patch }: { cert: Certification; patch: Patch }) {
                     });
                   }}
                 >
-                  編集
+                  <Pencil size={16} />
                 </button>
-                <button className="btn ghost sm danger" onClick={() => patch((c) => (c.plan = c.plan.filter((y) => y.id !== t.id)))}>
-                  削除
+                <button className="btn ghost icon danger" aria-label="削除" onClick={() => patch((c) => (c.plan = c.plan.filter((y) => y.id !== t.id)))}>
+                  <Trash2 size={16} />
                 </button>
               </span>
             </li>
@@ -293,24 +365,110 @@ function PlanSection({ cert, patch }: { cert: Certification; patch: Patch }) {
         })}
       </ul>
       <div className="row wrap">
-        <input className="grow" placeholder="予定（例: 公式ドキュメント EC2 章）" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
+        <input className="grow" aria-label="予定" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
         <input type="date" value={due} onChange={(e) => setDue(e.target.value)} aria-label="期限" />
-        <button className="btn" onClick={add}>
-          追加
+        <button className="btn icon" aria-label="追加" onClick={add}>
+          <Plus size={18} />
         </button>
       </div>
-      {cert.examDate && cert.plan.length === 0 && (
-        <button className="btn ghost sm mt" onClick={generateWeekly}>
-          受験日から逆算して週ごとの予定枠を作る
+    </Section>
+  );
+}
+
+function ExpenseRow({ e, setE, remove }: { e: Expense; setE: (fn: (x: Expense) => void) => void; remove: () => void }) {
+  const applied = e.status !== 'unapplied';
+  return (
+    <div className={`expense ${e.status}`}>
+      <div className="row">
+        <button
+          className={`check-toggle ${applied ? 'on' : ''}`}
+          aria-pressed={applied}
+          aria-label="申請済み"
+          title="申請済み"
+          onClick={() =>
+            setE((x) => {
+              x.status = applied ? 'unapplied' : 'applied';
+              x.appliedAt = applied ? undefined : x.appliedAt ?? todayYmd();
+            })
+          }
+        >
+          <Check size={22} />
         </button>
-      )}
-    </section>
+        <select value={e.kind} onChange={(ev) => { const v = ev.target.value as ExpenseKind; setE((x) => { x.kind = v; x.label = EXPENSE_KIND_LABEL[v]; }); }} aria-label="種別">
+          {Object.entries(EXPENSE_KIND_LABEL).map(([k, v]) => (
+            <option key={k} value={k}>
+              {v}
+            </option>
+          ))}
+        </select>
+        <label className="input-icon grow">
+          <JapaneseYen size={16} />
+          <input
+            type="number"
+            min={0}
+            inputMode="numeric"
+            value={e.amount || ''}
+            onChange={(ev) => {
+              const v = Number(ev.target.value) || 0;
+              setE((x) => (x.amount = v));
+            }}
+            aria-label="金額"
+          />
+        </label>
+      </div>
+      <div className="row wrap">
+        <div className="steps" role="radiogroup" aria-label="申請状況">
+          {(Object.keys(EXPENSE_STATUS_LABEL) as ExpenseStatus[]).map((s) => {
+            const Icon = EXPENSE_STEP_ICON[s];
+            return (
+              <button
+                key={s}
+                role="radio"
+                aria-checked={e.status === s}
+                className={e.status === s ? 'on' : ''}
+                title={EXPENSE_STATUS_LABEL[s]}
+                onClick={() =>
+                  setE((x) => {
+                    x.status = s;
+                    if (s === 'unapplied') x.appliedAt = undefined;
+                    else x.appliedAt ??= todayYmd();
+                  })
+                }
+              >
+                <Icon size={14} /> {EXPENSE_STATUS_LABEL[s]}
+              </button>
+            );
+          })}
+        </div>
+        <button
+          className={`btn icon toggle ${e.receiptSaved ? 'on' : ''}`}
+          aria-pressed={e.receiptSaved}
+          aria-label="領収書保存済み"
+          title="領収書保存済み"
+          onClick={() => setE((x) => (x.receiptSaved = !x.receiptSaved))}
+        >
+          <Receipt size={18} />
+        </button>
+        <label className="input-icon" title="申請期限">
+          <CalendarClock size={16} />
+          <input type="date" value={e.deadline ?? ''} onChange={(ev) => { const v = ev.target.value || undefined; setE((x) => (x.deadline = v)); }} aria-label="申請期限" />
+        </label>
+        <button className="btn ghost icon danger" aria-label="削除" onClick={() => confirm('削除?') && remove()}>
+          <Trash2 size={16} />
+        </button>
+      </div>
+      <label className="input-icon">
+        <StickyNote size={16} />
+        <input className="grow" value={e.note ?? ''} onChange={(ev) => { const v = ev.target.value || undefined; setE((x) => (x.note = v)); }} aria-label="備考" />
+      </label>
+    </div>
   );
 }
 
 function ExpenseSection({ cert, patch }: { cert: Certification; patch: Patch }) {
-  const addExpense = (kind: ExpenseKind) =>
-    patch((c) =>
+  const addExpense = () =>
+    patch((c) => {
+      const kind: ExpenseKind = c.expenses.some((e) => e.kind === 'exam') ? 'material' : 'exam';
       c.expenses.push({
         id: newId(),
         kind,
@@ -318,111 +476,41 @@ function ExpenseSection({ cert, patch }: { cert: Certification; patch: Patch }) 
         amount: 0,
         status: 'unapplied',
         receiptSaved: false,
-      }),
-    );
-  const setE = (eid: string, fn: (e: Certification['expenses'][number]) => void) =>
-    patch((c) => {
-      const e = c.expenses.find((x) => x.id === eid);
-      if (e) fn(e);
+      });
     });
   const total = cert.expenses.reduce((s, e) => s + (e.amount || 0), 0);
   const pending = cert.expenses.filter((e) => e.status !== 'paid').reduce((s, e) => s + (e.amount || 0), 0);
 
   return (
-    <section className="card">
-      <h2>経費申請</h2>
-      {cert.expenses.length === 0 && <p className="muted small">受験料・教材費などを登録して、申請漏れを防ぎましょう。</p>}
-      <div className="stack-sm">
-        {cert.expenses.map((e) => (
-          <div key={e.id} className={`expense ${e.status}`}>
-            <div className="row wrap">
-              <label className="row nowrap check-big">
-                <input
-                  type="checkbox"
-                  checked={e.status !== 'unapplied'}
-                  onChange={(ev) =>
-                    setE(e.id, (x) => {
-                      x.status = ev.target.checked ? 'applied' : 'unapplied';
-                      x.appliedAt = ev.target.checked ? x.appliedAt ?? todayYmd() : undefined;
-                    })
-                  }
-                />
-                申請済み
-              </label>
-              <input className="grow" value={e.label} onChange={(ev) => setE(e.id, (x) => (x.label = ev.target.value))} aria-label="項目名" />
-              <input
-                type="number"
-                min={0}
-                inputMode="numeric"
-                className="num-wide"
-                value={e.amount || ''}
-                placeholder="金額"
-                onChange={(ev) => setE(e.id, (x) => (x.amount = Number(ev.target.value) || 0))}
-                aria-label="金額"
-              />
-              <span className="muted">円</span>
-            </div>
-            <div className="row wrap small">
-              <select value={e.kind} onChange={(ev) => setE(e.id, (x) => (x.kind = ev.target.value as ExpenseKind))} aria-label="種別">
-                {Object.entries(EXPENSE_KIND_LABEL).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={e.status}
-                onChange={(ev) =>
-                  setE(e.id, (x) => {
-                    x.status = ev.target.value as ExpenseStatus;
-                    if (x.status !== 'unapplied') x.appliedAt ??= todayYmd();
-                  })
-                }
-                aria-label="申請状況"
-              >
-                {Object.entries(EXPENSE_STATUS_LABEL).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
-              </select>
-              <label className="row nowrap">
-                <input type="checkbox" checked={e.receiptSaved} onChange={(ev) => setE(e.id, (x) => (x.receiptSaved = ev.target.checked))} />
-                領収書保存済み
-              </label>
-              <label className="row nowrap">
-                申請期限
-                <input type="date" value={e.deadline ?? ''} onChange={(ev) => setE(e.id, (x) => (x.deadline = ev.target.value || undefined))} />
-              </label>
-              {e.appliedAt && <span className="muted">申請日 {formatYmd(e.appliedAt)}</span>}
-              <button
-                className="btn ghost sm danger"
-                onClick={() => confirm('この経費を削除しますか？') && patch((c) => (c.expenses = c.expenses.filter((x) => x.id !== e.id)))}
-              >
-                削除
-              </button>
-            </div>
-            <input
-              className="full small"
-              placeholder="備考（例: 合格時のみ支給、申請番号など）"
-              value={e.note ?? ''}
-              onChange={(ev) => setE(e.id, (x) => (x.note = ev.target.value || undefined))}
-            />
-          </div>
-        ))}
-      </div>
-      <div className="row wrap mt">
-        {(Object.keys(EXPENSE_KIND_LABEL) as ExpenseKind[]).map((k) => (
-          <button key={k} className="btn sm" onClick={() => addExpense(k)}>
-            + {EXPENSE_KIND_LABEL[k]}
+    <Section
+      Icon={JapaneseYen}
+      title="経費"
+      extra={
+        <span className="row nowrap">
+          {total > 0 && (
+            <span className="small muted" title="未精算 / 合計">
+              {pending.toLocaleString()} / {total.toLocaleString()}
+            </span>
+          )}
+          <button className="btn ghost icon" aria-label="経費を追加" onClick={addExpense}>
+            <Plus size={20} />
           </button>
-        ))}
-        {total > 0 && (
-          <span className="small">
-            合計 {total.toLocaleString()}円 / 未精算 {pending.toLocaleString()}円
-          </span>
-        )}
-      </div>
-    </section>
+        </span>
+      }
+    >
+      {cert.expenses.map((e) => (
+        <ExpenseRow
+          key={e.id}
+          e={e}
+          setE={(fn) =>
+            patch((c) => {
+              const x = c.expenses.find((y) => y.id === e.id);
+              if (x) fn(x);
+            })
+          }
+          remove={() => patch((c) => (c.expenses = c.expenses.filter((x) => x.id !== e.id)))}
+        />
+      ))}
+    </Section>
   );
 }

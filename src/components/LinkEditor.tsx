@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { StudyLink } from '../types';
 import { newId } from '../lib/id';
 import { LINK_PRESETS, hostOf, normalizeUrl } from '../lib/url';
+import { ArrowDown, ArrowUp, Link, Pencil, Plus, Trash2 } from './icons';
 
 interface Props {
   links: StudyLink[];
@@ -11,22 +12,18 @@ interface Props {
 export default function LinkEditor({ links, onChange }: Props) {
   const [label, setLabel] = useState('');
   const [url, setUrl] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(false);
 
   const add = (l: string, u: string) => {
     const normalized = normalizeUrl(u);
-    if (!normalized) {
-      setError('http(s) の URL を入力してください');
-      return;
-    }
-    if (links.some((x) => x.url === normalized)) {
-      setError('同じ URL が登録済みです');
+    if (!normalized || links.some((x) => x.url === normalized)) {
+      setError(true);
       return;
     }
     onChange([...links, { id: newId(), label: l.trim() || hostOf(normalized), url: normalized }]);
     setLabel('');
     setUrl('');
-    setError('');
+    setError(false);
   };
 
   const move = (i: number, dir: -1 | 1) => {
@@ -43,32 +40,33 @@ export default function LinkEditor({ links, onChange }: Props) {
         <ul className="list">
           {links.map((l, i) => (
             <li key={l.id} className="row between">
-              <a href={l.url} target="_blank" rel="noopener noreferrer" className="ellipsis">
-                🔗 {l.label} <span className="muted small">{hostOf(l.url)}</span>
+              <a href={l.url} target="_blank" rel="noopener noreferrer" className="grow ellipsis" title={l.url}>
+                <Link size={14} className="inline-icon" /> {l.label}
               </a>
               <span className="row nowrap">
-                <button className="btn ghost sm" aria-label="上へ" onClick={() => move(i, -1)}>
-                  ↑
+                <button className="btn ghost icon" aria-label="上へ" disabled={i === 0} onClick={() => move(i, -1)}>
+                  <ArrowUp size={16} />
                 </button>
-                <button className="btn ghost sm" aria-label="下へ" onClick={() => move(i, 1)}>
-                  ↓
+                <button className="btn ghost icon" aria-label="下へ" disabled={i === links.length - 1} onClick={() => move(i, 1)}>
+                  <ArrowDown size={16} />
                 </button>
                 <button
-                  className="btn ghost sm"
+                  className="btn ghost icon"
+                  aria-label="編集"
                   onClick={() => {
-                    const nl = prompt('表示名', l.label);
+                    const nl = prompt('名前', l.label);
                     if (nl === null) return;
                     const nu = prompt('URL', l.url);
                     if (nu === null) return;
                     const norm = normalizeUrl(nu);
-                    if (!norm) return alert('http(s) の URL を入力してください');
+                    if (!norm) return;
                     onChange(links.map((x) => (x.id === l.id ? { ...x, label: nl.trim() || hostOf(norm), url: norm } : x)));
                   }}
                 >
-                  編集
+                  <Pencil size={16} />
                 </button>
-                <button className="btn ghost sm danger" onClick={() => onChange(links.filter((x) => x.id !== l.id))}>
-                  削除
+                <button className="btn ghost icon danger" aria-label="削除" onClick={() => onChange(links.filter((x) => x.id !== l.id))}>
+                  <Trash2 size={16} />
                 </button>
               </span>
             </li>
@@ -76,25 +74,28 @@ export default function LinkEditor({ links, onChange }: Props) {
         </ul>
       )}
       <div className="row wrap">
-        <input placeholder="表示名（例: Skill Builder）" value={label} onChange={(e) => setLabel(e.target.value)} />
+        <input className="grow" placeholder="名前" value={label} onChange={(e) => setLabel(e.target.value)} aria-label="名前" />
         <input
-          placeholder="https://..."
+          className={`grow ${error ? 'invalid' : ''}`}
+          placeholder="https://"
           type="url"
           inputMode="url"
           value={url}
-          onChange={(e) => setUrl(e.target.value)}
+          onChange={(e) => {
+            setUrl(e.target.value);
+            setError(false);
+          }}
           onKeyDown={(e) => e.key === 'Enter' && add(label, url)}
+          aria-label="URL"
         />
-        <button className="btn" onClick={() => add(label, url)}>
-          追加
+        <button className="btn icon" aria-label="追加" onClick={() => add(label, url)}>
+          <Plus size={18} />
         </button>
       </div>
-      {error && <div className="error small">{error}</div>}
       <div className="chips">
-        <span className="muted small">よく使うサイト:</span>
         {LINK_PRESETS.filter((p) => !links.some((l) => l.url === p.url)).map((p) => (
           <button key={p.url} className="chip" onClick={() => add(p.label, p.url)}>
-            + {p.label}
+            <Plus size={12} /> {p.label}
           </button>
         ))}
       </div>
